@@ -58,7 +58,7 @@ class ContentService extends ChangeNotifier {
   // NEW: Smart loading - only load if not already loaded this session
   Future<void> loadContentIfNeeded() async {
     if (_hasLoadedOnce && _allContent.isNotEmpty) {
-      print('Content already loaded this session, skipping...');
+      // print('Content already loaded this session, skipping...');
       return;
     }
     await loadContent();
@@ -75,14 +75,14 @@ class ContentService extends ChangeNotifier {
       if (cachedData != null) {
         _allContent = cachedData;
         _hasLoadedOnce = true;
-        print('Loaded ${_allContent.length} items from cache');
+        // print('Loaded ${_allContent.length} items from cache');
         _isLoading = false;
         notifyListeners();
         return;
       }
 
       // If no cache, download from network
-      print('No cache found, downloading from network...');
+      // print('No cache found, downloading from network...');
       final response = await http.get(Uri.parse(csvUrl));
       
       if (response.statusCode == 200) {
@@ -97,13 +97,13 @@ class ContentService extends ChangeNotifier {
         // NEW: Cache the data
         await _saveToCache(_allContent);
         _hasLoadedOnce = true;
-        print('Loaded ${_allContent.length} content items from network');
+        // print('Loaded ${_allContent.length} content items from network');
       } else {
         _error = 'Failed to load content: ${response.statusCode}';
       }
     } catch (e) {
       _error = 'Error loading content: $e';
-      print('Error loading content: $e');
+      // print('Error loading content: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -120,7 +120,7 @@ class ContentService extends ChangeNotifier {
         return jsonList.map((json) => ContentItem.fromJson(json)).toList();
       }
     } catch (e) {
-      print('Error loading from cache: $e');
+      // print('Error loading from cache: $e');
     }
     return null;
   }
@@ -131,9 +131,9 @@ class ContentService extends ChangeNotifier {
       final jsonString = json.encode(content.map((item) => item.toJson()).toList());
       await prefs.setString(_cacheKey, jsonString);
       await prefs.setInt(_cacheTimeKey, DateTime.now().millisecondsSinceEpoch);
-      print('Content cached successfully');
+      // print('Content cached successfully');
     } catch (e) {
-      print('Error saving to cache: $e');
+      // print('Error saving to cache: $e');
     }
   }
 

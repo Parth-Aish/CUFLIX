@@ -18,7 +18,7 @@ class TelegramService {
       _prefs = await SharedPreferences.getInstance();
       return _prefs;
     } catch (e) {
-      print('SharedPreferences error: $e');
+      // print('SharedPreferences error: $e');
       return null;
     }
   }
@@ -29,7 +29,7 @@ class TelegramService {
       final prefs = await _getPrefs();
       return prefs?.getString(_botTokenKey);
     } catch (e) {
-      print('Error getting stored bot token: $e');
+      // print('Error getting stored bot token: $e');
       return null;
     }
   }
@@ -39,9 +39,8 @@ class TelegramService {
     try {
       final prefs = await _getPrefs();
       await prefs?.setString(_botTokenKey, token);
-      print('✅ Bot token saved successfully');
     } catch (e) {
-      print('Error saving bot token: $e');
+      // print('Error saving bot token: $e');
     }
   }
 
@@ -51,7 +50,6 @@ class TelegramService {
       final prefs = await _getPrefs();
       return prefs?.getString(_chatIdKey);
     } catch (e) {
-      print('Error getting stored chat ID: $e');
       return null;
     }
   }
@@ -61,9 +59,9 @@ class TelegramService {
     try {
       final prefs = await _getPrefs();
       await prefs?.setString(_chatIdKey, chatId);
-      print('✅ Chat ID saved successfully: $chatId');
     } catch (e) {
-      print('Error saving chat ID: $e');
+      // print('Error saving chat ID: $e');
+      return;
     }
   }
 
@@ -80,9 +78,8 @@ class TelegramService {
       final prefs = await _getPrefs();
       await prefs?.remove(_botTokenKey);
       await prefs?.remove(_chatIdKey);
-      print('✅ Stored credentials cleared');
     } catch (e) {
-      print('Error clearing credentials: $e');
+      return;
     }
   }
 
@@ -112,7 +109,6 @@ class TelegramService {
             final chat = message['chat'];
             if (chat != null) {
               final chatId = chat['id'].toString();
-              print('✅ Chat ID found: $chatId');
               // Automatically save the chat ID when found
               await saveChatId(chatId);
               return chatId;
@@ -124,8 +120,7 @@ class TelegramService {
         throw Exception('Failed to fetch updates: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error getting chat ID: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -178,7 +173,6 @@ class TelegramService {
         );
         
         if (!success) {
-          print('Failed to send file ${i + 1}');
           allSuccess = false;
         }
         
@@ -189,7 +183,6 @@ class TelegramService {
       
       return allSuccess;
     } catch (e) {
-      print('Error sending content files: $e');
       rethrow;
     }
   }
@@ -224,18 +217,15 @@ class TelegramService {
         if (response.statusCode == 200) {
           final responseData = json.decode(response.body);
           if (responseData['ok']) {
-            print('✅ File sent successfully via $endpoint');
             return true;
           }
         }
         
         await Future.delayed(const Duration(milliseconds: 200));
       }
-      
-      print('❗ Failed to send file with all endpoints');
+    
       return false;
     } catch (e) {
-      print('Error sending single file: $e');
       return false;
     }
   }

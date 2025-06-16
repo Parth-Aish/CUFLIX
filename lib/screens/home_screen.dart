@@ -1,12 +1,11 @@
-// lib/screens/home_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cuflix/services/content_service.dart';
+
 import 'package:cuflix/models/content_item.dart';
 import 'package:cuflix/screens/content_detail_screen.dart';
-import 'package:cuflix/widgets/telegram_setup_dialog.dart';
+import 'package:cuflix/services/content_service.dart';
 import 'package:cuflix/services/telegram_service.dart';
+import 'package:cuflix/widgets/telegram_setup_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,7 +15,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late ScrollController _scrollController;
+  late final ScrollController _scrollController;
   String _selectedCategory = 'All';
   ContentItem? _featuredContent;
 
@@ -24,28 +23,25 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _scrollController = ScrollController();
-    
+
     // Load content only if needed (smart caching)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ContentService>().loadContentIfNeeded().then((_) {
-        _updateFeaturedContent();
-      });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<ContentService>().loadContentIfNeeded();
+      if (!mounted) return;
+      _updateFeaturedContent();
     });
   }
 
   void _updateFeaturedContent() {
     final contentService = context.read<ContentService>();
-    setState(() {
-      _featuredContent = contentService.getRandomFeaturedContent();
-    });
+    setState(() => _featuredContent = contentService.getRandomFeaturedContent());
   }
 
   // Reset to home screen
   void _resetToHome() {
-    setState(() {
-      _selectedCategory = 'All';
-    });
+    setState(() => _selectedCategory = 'All');
     _updateFeaturedContent();
+
     // Scroll to top
     _scrollController.animateTo(
       0,
@@ -93,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
           return RefreshIndicator(
             onRefresh: () async {
               await contentService.forceRefresh();
+              if (!mounted) return;
               _updateFeaturedContent();
             },
             child: CustomScrollView(
@@ -118,8 +115,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /* ---------- Featured header ---------- */
+
   Widget _buildFeaturedContent(ContentService contentService) {
-    final featuredContent = _featuredContent ?? contentService.getRandomFeaturedContent();
+    final featuredContent =
+        _featuredContent ?? contentService.getRandomFeaturedContent();
 
     if (featuredContent == null) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
@@ -133,125 +133,103 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /* ---------- Category sections ---------- */
+
   Widget _buildContentSections(ContentService contentService) {
-  final filteredContent = contentService.getFilteredContent(_selectedCategory);
-  
-  List<Widget> sections = [];
+    final filteredContent = contentService.getFilteredContent(_selectedCategory);
+    final List<Widget> sections = [];
 
-  if (_selectedCategory == 'All') {
-    // Show all categories with dynamic content rows
-    sections.addAll([
-      _ContentList(title: 'New Releases', contentList: contentService.allContent.reversed.take(10).toList()),
-      
-      // NEW: Get individual categories from comma-separated values
-      ..._getIndividualCategorySections(contentService.allContent).take(6).map((categorySection) =>
+    if (_selectedCategory == 'All') {
+      // Show all categories with dynamic content rows
+      sections.addAll([
         _ContentList(
-          title: categorySection['title']!,
-          contentList: categorySection['content'].take(8).toList(),
+          title: 'New Releases',
+          contentList: contentService.allContent.reversed.take(10).toList(),
         ),
-      ),
-    ]);
-  } else {
-    // Show only selected category content
-    sections.add(_ContentList(
-      title: _selectedCategory,
-      contentList: filteredContent,
-    ));
-
-    // Add subcategories for the selected type
-    if (_selectedCategory == 'TV Shows') {
-      final tvShowSections = _getIndividualCategorySections(
-        contentService.tvShows,
-        contentType: 'tv',
-      );
-      sections.addAll([
-        ...tvShowSections.take(3).map((categorySection) =>
-          _ContentList(
-            title: categorySection['title']!,
-            contentList: categorySection['content'].take(8).toList(),
+        ..._getIndividualCategorySections(contentService.allContent)
+            .take(6)
+            .map(
+          (section) => _ContentList(
+            title: section['title']!,
+            contentList: section['content'].take(8).toList(),
           ),
         ),
       ]);
-    } else if (_selectedCategory == 'Movies') {
-      final movieSections = _getIndividualCategorySections(
-        contentService.movies,
-        contentType: 'movie',
+    } else {
+      // Show only selected category content
+      sections.add(
+        _ContentList(title: _selectedCategory, contentList: filteredContent),
       );
-      sections.addAll([
-        ...movieSections.take(3).map((categorySection) =>
-          _ContentList(
-            title: categorySection['title']!,
-            contentList: categorySection['content'].take(8).toList(),
-          ),
-        ),
-      ]);
-    } else if (_selectedCategory == 'Anime') {
-      sections.addAll([
-        _ContentList(title: 'Anime Movies', contentList: contentService.animeMovies.take(8).toList()),
-        _ContentList(title: 'Anime Series', contentList: contentService.animeSeries.take(8).toList()),
-      ]);
-      
-      final animeSections = _getIndividualCategorySections(
-        contentService.allAnime,
-        contentType: 'anime',
-      );
-      sections.addAll([
-        ...animeSections.take(2).map((categorySection) =>
-          _ContentList(
-            title: categorySection['title']!,
-            contentList: categorySection['content'].take(8).toList(),
-          ),
-        ),
-      ]);
-    }
-  }
 
-  return SliverList(
-    delegate: SliverChildListDelegate(sections),
-  );
-}
+      // Add sub-categories for the selected type
+      if (_selectedCategory == 'TV Shows') {
+        final tvSections =
+            _getIndividualCategorySections(contentService.tvShows, contentType: 'tv');
+        sections.addAll(tvSections.take(3).map((section) => _ContentList(
+              title: section['title']!,
+              contentList: section['content'].take(8).toList(),
+            )));
+      } else if (_selectedCategory == 'Movies') {
+        final movieSections =
+            _getIndividualCategorySections(contentService.movies, contentType: 'movie');
+        sections.addAll(movieSections.take(3).map((section) => _ContentList(
+              title: section['title']!,
+              contentList: section['content'].take(8).toList(),
+            )));
+      } else if (_selectedCategory == 'Anime') {
+        sections.addAll([
+          _ContentList(
+              title: 'Anime Movies',
+              contentList: contentService.animeMovies.take(8).toList()),
+          _ContentList(
+              title: 'Anime Series',
+              contentList: contentService.animeSeries.take(8).toList()),
+        ]);
 
-// NEW: Helper method to create individual category sections from comma-separated categories
-List<Map<String, dynamic>> _getIndividualCategorySections(
-  List<ContentItem> contentList, {
-  String? contentType,
-}) {
-  // Create a map to group content by individual categories
-  final Map<String, List<ContentItem>> categoryMap = {};
-  
-  for (final item in contentList) {
-    // Split comma-separated categories and trim whitespace
-    final categories = item.category.split(',').map((cat) => cat.trim()).toList();
-    
-    for (final category in categories) {
-      if (category.isNotEmpty) {
-        if (!categoryMap.containsKey(category)) {
-          categoryMap[category] = [];
-        }
-        categoryMap[category]!.add(item);
+        final animeSections =
+            _getIndividualCategorySections(contentService.allAnime, contentType: 'anime');
+        sections.addAll(animeSections.take(2).map((section) => _ContentList(
+              title: section['title']!,
+              contentList: section['content'].take(8).toList(),
+            )));
       }
     }
+
+    return SliverList(delegate: SliverChildListDelegate(sections));
   }
-  
-  // Convert to list of maps and sort by content count (most popular first)
-  final List<Map<String, dynamic>> sections = categoryMap.entries
-      .map((entry) => {
-            'title': entry.key,
-            'content': entry.value,
-          })
-      .toList();
-  
-  // Sort by number of items in each category (descending)
-  sections.sort((a, b) => (b['content'] as List).length.compareTo((a['content'] as List).length));
-  
-  return sections;
+
+  /* ---------- Helper for splitting comma-separated categories ---------- */
+
+  List<Map<String, dynamic>> _getIndividualCategorySections(
+    List<ContentItem> contentList, {
+    String? contentType,
+  }) {
+    final Map<String, List<ContentItem>> categoryMap = {};
+
+    for (final item in contentList) {
+      final categories = item.category.split(',').map((c) => c.trim());
+
+      for (final cat in categories) {
+        if (cat.isEmpty) continue;
+        categoryMap.putIfAbsent(cat, () => []).add(item);
+      }
+    }
+
+    final sections = categoryMap.entries
+        .map((e) => {'title': e.key, 'content': e.value})
+        .toList()
+      ..sort((a, b) =>
+          (b['content'] as List).length.compareTo((a['content'] as List).length));
+
+    return sections;
+  }
 }
 
-}
+/* ════════════════════  APP BAR  ════════════════════ */
 
 class _CustomSliverAppBar extends StatelessWidget {
   final String selectedCategory;
-  final Function(String) onCategoryChanged;
+  final ValueChanged<String> onCategoryChanged;
   final VoidCallback onLogoTap;
 
   const _CustomSliverAppBar({
@@ -265,21 +243,19 @@ class _CustomSliverAppBar extends StatelessWidget {
     return SliverAppBar(
       floating: true,
       backgroundColor: Colors.black,
-      // Make logo clickable
       title: GestureDetector(
         onTap: onLogoTap,
         child: Image.asset('assets/logo1.png', height: 170),
       ),
       centerTitle: true,
-      // Add back button when not on "All" category
-      leading: selectedCategory != 'All' 
+      leading: selectedCategory != 'All'
           ? IconButton(
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => onCategoryChanged('All'),
             )
           : null,
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(40.0),
+        preferredSize: const Size.fromHeight(40),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -330,7 +306,7 @@ class _AppBarButton extends StatelessWidget {
           title,
           style: TextStyle(
             color: isSelected ? Colors.black : Colors.white,
-            fontSize: 16.0,
+            fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -338,6 +314,8 @@ class _AppBarButton extends StatelessWidget {
     );
   }
 }
+
+/* ════════════════════  FEATURED HEADER  ════════════════════ */
 
 class _ContentHeader extends StatelessWidget {
   final ContentItem featuredContent;
@@ -351,14 +329,14 @@ class _ContentHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20.0),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
         children: [
           if (onRefresh != null)
             Align(
               alignment: Alignment.topRight,
               child: Padding(
-                padding: const EdgeInsets.only(right: 16.0),
+                padding: const EdgeInsets.only(right: 16),
                 child: IconButton(
                   icon: const Icon(Icons.refresh, color: Colors.white),
                   onPressed: onRefresh,
@@ -369,7 +347,7 @@ class _ContentHeader extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => ContentDetailScreen(content: featuredContent),
+                builder: (_) => ContentDetailScreen(content: featuredContent),
               ),
             ),
             child: ClipRRect(
@@ -378,20 +356,18 @@ class _ContentHeader extends StatelessWidget {
                 featuredContent.posterUrl,
                 height: 400,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 400,
-                    color: Colors.grey[800],
-                    child: const Icon(Icons.error, color: Colors.white),
-                  );
-                },
+                errorBuilder: (_, __, ___) => Container(
+                  height: 400,
+                  color: Colors.grey[800],
+                  child: const Icon(Icons.error, color: Colors.white),
+                ),
               ),
             ),
           ),
           const SizedBox(height: 12),
           Text(
             '${featuredContent.category} • ${featuredContent.contentType}',
-            style: const TextStyle(color: Colors.white, fontSize: 14.0),
+            style: const TextStyle(color: Colors.white, fontSize: 14),
           ),
           const SizedBox(height: 12),
           Row(
@@ -400,12 +376,14 @@ class _ContentHeader extends StatelessWidget {
               _PlayButton(content: featuredContent),
               _InfoButton(content: featuredContent),
             ],
-          )
+          ),
         ],
       ),
     );
   }
 }
+
+/* ════════════════════  PLAY / INFO BUTTONS  ════════════════════ */
 
 class _PlayButton extends StatelessWidget {
   final ContentItem content;
@@ -419,28 +397,35 @@ class _PlayButton extends StatelessWidget {
         onPressed: () => _handlePlayButton(context),
         style: FilledButton.styleFrom(backgroundColor: Colors.white),
         icon: const Icon(Icons.play_arrow, color: Colors.black),
-        label: const Text('Play', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        label: const Text(
+          'Play',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
 
+  /* ------------ 1. Decide what to do ------------ */
   Future<void> _handlePlayButton(BuildContext context) async {
     final isSetupComplete = await TelegramService.isSetupComplete();
-    
+
+    // Guard: context might have un-mounted while we were waiting
+    if (!context.mounted) return;
+
     if (isSetupComplete) {
-      // Send directly without dialog
-      _sendDirectly(context);
+      await _sendDirectly(context);
     } else {
-      // Show setup dialog
       _showTelegramDialog(context);
     }
   }
 
+  /* ------------ 2. Send files directly ------------ */
   Future<void> _sendDirectly(BuildContext context) async {
+    // Show progress before the async gap
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (_) => AlertDialog(
         backgroundColor: Colors.grey[900],
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -459,40 +444,38 @@ class _PlayButton extends StatelessWidget {
     try {
       final success = await TelegramService.sendContentFiles(
         content: content,
-        linkIndex: 0, // Default to first link
+        linkIndex: 0,
       );
 
-      Navigator.of(context).pop();
+      if (!context.mounted) return;
 
+      Navigator.of(context).pop(); // close dialog
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            success 
-                ? '✅ Files sent successfully!'
-                : '❌ Failed to send files.',
+            success ? '✅ Files sent successfully!' : '❌ Failed to send files.',
           ),
           backgroundColor: success ? Colors.green : Colors.red,
         ),
       );
     } catch (e) {
-      Navigator.of(context).pop();
-      
+      if (!context.mounted) return;
+
+      Navigator.of(context).pop(); // close dialog
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: ${e.toString()}'),
+          content: Text('Error: $e'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
+  /* ------------ 3. First-time setup ------------ */
   void _showTelegramDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => TelegramSetupDialog(
-        content: content,
-        linkIndex: 0,
-      ),
+      builder: (_) => TelegramSetupDialog(content: content, linkIndex: 0),
     );
   }
 }
@@ -509,16 +492,21 @@ class _InfoButton extends StatelessWidget {
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ContentDetailScreen(content: content),
+            builder: (_) => ContentDetailScreen(content: content),
           ),
         ),
         style: FilledButton.styleFrom(backgroundColor: Colors.grey.shade800),
         icon: const Icon(Icons.info_outline, color: Colors.white),
-        label: const Text('Info', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        label: const Text(
+          'Info',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
 }
+
+/* ════════════════════  HORIZONTAL CONTENT LIST  ════════════════════ */
 
 class _ContentList extends StatelessWidget {
   final String title;
@@ -530,64 +518,63 @@ class _ContentList extends StatelessWidget {
     if (contentList.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Text(
               title,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 20.0,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
           SizedBox(
-            height: 220.0,
+            height: 220,
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               scrollDirection: Axis.horizontal,
               itemCount: contentList.length,
-              itemBuilder: (BuildContext context, int index) {
-                final ContentItem content = contentList[index];
+              itemBuilder: (_, index) {
+                final item = contentList[index];
                 return GestureDetector(
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ContentDetailScreen(content: content),
+                      builder: (_) => ContentDetailScreen(content: item),
                     ),
                   ),
                   child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 8.0),
-                    height: 200.0,
-                    width: 130.0,
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                    height: 200,
+                    width: 130,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Image.network(
-                        content.posterUrl,
+                        item.posterUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[800],
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.error, color: Colors.white),
-                                const SizedBox(height: 8),
-                                Text(
-                                  content.name,
-                                  style: const TextStyle(color: Colors.white, fontSize: 10),
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                        errorBuilder: (_, __, ___) => Container(
+                          color: Colors.grey[800],
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.error, color: Colors.white),
+                              const SizedBox(height: 8),
+                              Text(
+                                item.name,
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 10),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),

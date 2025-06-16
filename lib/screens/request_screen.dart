@@ -59,7 +59,7 @@ CU-FLIX User''';
         return true;
       }
     } catch (e) {
-      print('Gmail app method failed: $e');
+      // print('Gmail app method failed: $e');
     }
     return false;
   }
@@ -83,7 +83,7 @@ CU-FLIX User''';
         return true;
       }
     } catch (e) {
-      print('Email intent method failed: $e');
+      // print('Email intent method failed: $e');
     }
     return false;
   }
@@ -100,7 +100,7 @@ CU-FLIX User''';
         return true;
       }
     } catch (e) {
-      print('Mailto method failed: $e');
+      // print('Mailto method failed: $e');
     }
     return false;
   }
@@ -269,7 +269,7 @@ CU-FLIX User''';
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF076AE0).withOpacity(0.2),
+                              color: const Color(0xFF076AE0).withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: const Color(0xFF076AE0)),
                             ),

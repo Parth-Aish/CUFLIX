@@ -39,7 +39,7 @@ class GetStartedScreenState extends State<GetStartedScreen> {
       }
       // If not signed in, stay on GetStartedScreen
     } catch (e) {
-      print('Error checking sign-in status: $e');
+      // print('Error checking sign-in status: $e');
       // On error, stay on GetStartedScreen
     }
   }

@@ -59,48 +59,53 @@ class _SignInScreenState extends State<SignInScreen> {
 
   // Handle page ready events
   void _handlePageReady(InAppWebViewController controller) async {
-    final currentUrl = (await controller.getUrl()).toString();
+  final currentUrl = (await controller.getUrl()).toString();
 
-    // Check for successful login
-    if (currentUrl.contains("StudentHome.aspx") || currentUrl.contains("LandingPage.aspx")) {
-      if (mounted) {
-        setState(() => _loginState = LoginState.success);
-        
-        // Save authentication state
-        await _saveSignInState(true);
-        
-        // Navigate to main screen and remove all previous routes
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const NavScreen()),
-          (Route<dynamic> route) => false,
-        );
-      }
-      return;
-    }
+  // ── 1.  Successful login ───────────────────────────────────────────────
+  if (currentUrl.contains('StudentHome.aspx') ||
+      currentUrl.contains('LandingPage.aspx')) {
 
-    // Wait for password page to be ready
-    bool isPasswordPageReady = await _waitForElement(controller, 'txtLoginPassword');
+    // a) everything that does NOT need context ----------------------------
+    await _saveSignInState(true);
 
-    if (isPasswordPageReady) {
-      await _extractCaptchaAsScreenshot(controller);
-    } else if (_loginState == LoginState.loading) {
-      if (mounted) {
-        setState(() {
-          _loginState = LoginState.error;
-          _errorMessage = "Page timed out or an unknown error occurred.";
-        });
-      }
-    }
+    // b) bail out if widget got disposed while we were waiting ------------
+    if (!mounted) return;
+
+    // c) now we can safely use context / setState -------------------------
+    setState(() => _loginState = LoginState.success);
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const NavScreen()),
+      (_) => false,
+    );
+    return;
   }
+
+  // ── 2.  Wait for password page to load ─────────────────────────────────
+  final isPasswordPageReady =
+      await _waitForElement(controller, 'txtLoginPassword');
+
+  if (!mounted) return;               // <- guard after the await again
+
+  if (isPasswordPageReady) {
+    await _extractCaptchaAsScreenshot(controller);
+  } else if (_loginState == LoginState.loading) {
+    setState(() {
+      _loginState  = LoginState.error;
+      _errorMessage = 'Page timed out or an unknown error occurred.';
+    });
+  }
+}
+
 
   // Save sign-in state for persistent authentication
   Future<void> _saveSignInState(bool isSignedIn) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isSignedIn', isSignedIn);
-      print('Sign-in state saved: $isSignedIn');
+      // print('Sign-in state saved: $isSignedIn');
     } catch (e) {
-      print('Error saving sign-in state: $e');
+      // print('Error saving sign-in state: $e');
     }
   }
   
@@ -253,7 +258,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red[900]?.withOpacity(0.3),
+                      color: Colors.red[900]?.withValues(alpha:0.3),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.red[700]!),
                     ),

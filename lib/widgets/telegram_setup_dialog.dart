@@ -162,7 +162,9 @@ class _TelegramSetupDialogState extends State<TelegramSetupDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue[900]?.withOpacity(0.3),
+                color: Colors.blue[900]?.withValues(
+                  alpha: 0.3,
+                ),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.blue[700]!),
               ),
@@ -228,7 +230,7 @@ class _TelegramSetupDialogState extends State<TelegramSetupDialog> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue[900]?.withOpacity(0.3),
+                  color: Colors.blue[900]?.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -257,7 +259,7 @@ class _TelegramSetupDialogState extends State<TelegramSetupDialog> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red[900]?.withOpacity(0.3),
+                  color: Colors.red[900]?.withValues(alpha :0.3),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.red[700]!),
                 ),
@@ -272,7 +274,7 @@ class _TelegramSetupDialogState extends State<TelegramSetupDialog> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.green[900]?.withOpacity(0.3),
+                  color: Colors.blue[900]?.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.green[700]!),
                 ),

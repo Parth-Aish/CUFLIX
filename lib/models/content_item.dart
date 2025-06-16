@@ -29,7 +29,7 @@ class ContentItem {
 
   factory ContentItem.fromCsvRow(List<dynamic> row) {
     return ContentItem(
-      name: row.length > 0 ? row[0]?.toString() ?? '' : '',
+      name: row.isNotEmpty ? row[0]?.toString() ?? '' : '',
       posterUrl: row.length > 1 ? row[1]?.toString() ?? '' : '',
       contentType: row.length > 2 ? row[2]?.toString() ?? '' : '',
       season: row.length > 3 ? row[3]?.toString() : null,

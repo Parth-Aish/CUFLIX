@@ -25,18 +25,22 @@ class _TelegramSetupDialogState extends State<TelegramSetupDialog> {
   String? _errorMessage;
   String? _successMessage;
   String? _currentStep;
+  bool _isSetupComplete = false;
 
   @override
   void initState() {
     super.initState();
-    _loadStoredToken();
+    _loadInitialState();
   }
 
-  Future<void> _loadStoredToken() async {
+  Future<void> _loadInitialState() async {
     final token = await TelegramService.getStoredBotToken();
-    if (token != null) {
-      _tokenController.text = token;
-    }
+    final isComplete = await TelegramService.isSetupComplete();
+
+    setState(() {
+      if (token != null) _tokenController.text = token;
+      _isSetupComplete = isComplete;
+    });
   }
 
   Future<void> _openTutorial() async {
@@ -46,15 +50,27 @@ class _TelegramSetupDialogState extends State<TelegramSetupDialog> {
     }
   }
 
+  Future<void> _resetToken() async {
+    await TelegramService.clearStoredCredentials();
+    setState(() {
+      _tokenController.clear();
+      _successMessage = null;
+      _errorMessage = null;
+      _currentStep = null;
+      _isSetupComplete = false;
+    });
+  }
+
   Future<void> _sendFiles() async {
-    if (_tokenController.text.trim().isEmpty) {
+    final token = _tokenController.text.trim();
+    if (token.isEmpty) {
       setState(() {
         _errorMessage = 'Please enter your bot token';
       });
       return;
     }
 
-    if (!TelegramService.isValidBotToken(_tokenController.text.trim())) {
+    if (!TelegramService.isValidBotToken(token)) {
       setState(() {
         _errorMessage = 'Invalid bot token format.\nShould be like: 123456789:ABCdefGHIjklMNOpqrSTUvwxyz';
       });
@@ -68,19 +84,14 @@ class _TelegramSetupDialogState extends State<TelegramSetupDialog> {
       _currentStep = 'Validating bot token...';
     });
 
-    final botToken = _tokenController.text.trim();
-    
     try {
-      // Save the token first
-      await TelegramService.saveBotToken(botToken);
-      
+      await TelegramService.saveBotToken(token);
       setState(() {
         _currentStep = 'Looking for chat messages...';
       });
 
-      // FIXED: Changed 'botToken:' to 'providedBotToken:'
       final success = await TelegramService.sendContentFiles(
-        providedBotToken: botToken,
+        providedBotToken: token,
         content: widget.content,
         linkIndex: widget.linkIndex,
       );
@@ -91,6 +102,7 @@ class _TelegramSetupDialogState extends State<TelegramSetupDialog> {
         if (success) {
           _successMessage = '✅ Files sent successfully to Telegram!';
           _errorMessage = null;
+          _isSetupComplete = true;
         } else {
           _errorMessage = 'Failed to send files. Please check your bot token.';
         }
@@ -101,12 +113,11 @@ class _TelegramSetupDialogState extends State<TelegramSetupDialog> {
           if (mounted) Navigator.of(context).pop();
         });
       }
-
     } catch (e) {
       setState(() {
         _isLoading = false;
         _currentStep = null;
-        
+
         if (e.toString().contains('CHAT_ID_NOT_FOUND')) {
           _errorMessage = _buildChatIdNotFoundMessage();
         } else if (e.toString().contains('Bot token is invalid')) {
@@ -150,143 +161,151 @@ class _TelegramSetupDialogState extends State<TelegramSetupDialog> {
             'Send to Telegram',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
+          const Spacer(),
+          if (_isSetupComplete)
+            Tooltip(
+              message: 'Setup Complete',
+              child: const Icon(Icons.verified, color: Colors.green),
+            )
+          else
+            Tooltip(
+              message: 'Setup Incomplete',
+              child: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+            ),
         ],
       ),
       content: SizedBox(
         width: double.maxFinite,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Content Info
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue[900]?.withValues(
-                  alpha: 0.3,
-                ),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue[700]!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '🎬 ${widget.content.name}',
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  if (widget.content.isTVShow || widget.content.isAnimeSeries)
-                    Text(
-                      '📺 Season ${widget.linkIndex + 1}',
-                      style: const TextStyle(color: Colors.blue, fontSize: 14),
-                    ),
-                  Text(
-                    '📂 ${widget.content.availableLinks[widget.linkIndex].split(',').length} file(s)',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 20),
-            
-            // Bot Token Input
-            TextField(
-              controller: _tokenController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'Bot Token',
-                labelStyle: const TextStyle(color: Colors.white70),
-                hintText: '123456789:ABCdefGHIjklMNOpqrSTUvwxyz',
-                hintStyle: const TextStyle(color: Colors.white30),
-                filled: true,
-                fillColor: Colors.grey[800],
-                prefixIcon: const Icon(Icons.token, color: Colors.white54),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Help Button
-            Center(
-              child: TextButton.icon(
-                onPressed: _openTutorial,
-                icon: const Icon(Icons.help_outline, color: Colors.blue),
-                label: const Text(
-                  "How to get Bot Token?",
-                  style: TextStyle(color: Colors.blue),
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Loading Step
-            if (_currentStep != null)
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Content Info
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue[900]?.withValues(alpha: 0.3),
+                  color: Colors.blue[900]?.withAlpha(30),
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue[700]!),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.blue,
-                      ),
+                    Text(
+                      '🎬 ${widget.content.name}',
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _currentStep!,
-                        style: const TextStyle(color: Colors.white),
+                    if (widget.content.isTVShow || widget.content.isAnimeSeries)
+                      Text(
+                        '📺 Season ${widget.linkIndex + 1}',
+                        style: const TextStyle(color: Colors.blue, fontSize: 14),
                       ),
+                    Text(
+                      '📂 ${widget.content.availableLinks[widget.linkIndex].split(',').length} file(s)',
+                      style: const TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                   ],
                 ),
               ),
-            
-            // Error Message
-            if (_errorMessage != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red[900]?.withValues(alpha :0.3),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red[700]!),
-                ),
-                child: Text(
-                  _errorMessage!,
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
-              
-            // Success Message
-            if (_successMessage != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue[900]?.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green[700]!),
-                ),
-                child: Text(
-                  _successMessage!,
-                  style: const TextStyle(color: Colors.white),
+              const SizedBox(height: 20),
+
+              // Bot Token Input
+              TextField(
+                controller: _tokenController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Bot Token',
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  hintText: '123456789:ABCdefGHIjklMNOpqrSTUvwxyz',
+                  hintStyle: const TextStyle(color: Colors.white30),
+                  filled: true,
+                  fillColor: Colors.grey[800],
+                  prefixIcon: const Icon(Icons.token, color: Colors.white54),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
-          ],
+              const SizedBox(height: 16),
+
+              // Help Button
+              Center(
+                child: TextButton.icon(
+                  onPressed: _openTutorial,
+                  icon: const Icon(Icons.help_outline, color: Colors.blue),
+                  label: const Text(
+                    "How to get Bot Token?",
+                    style: TextStyle(color: Colors.blue),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              if (_currentStep != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[900]?.withAlpha(30),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _currentStep!,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              if (_errorMessage != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red[900]?.withAlpha(30),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red[700]!),
+                  ),
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+
+              if (_successMessage != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green[900]?.withAlpha(30),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green[700]!),
+                  ),
+                  child: Text(
+                    _successMessage!,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
       actions: [
+        TextButton(
+          onPressed: _isLoading ? null : _resetToken,
+          child: const Text('Reset'),
+        ),
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),

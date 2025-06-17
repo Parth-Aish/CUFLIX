@@ -3,10 +3,28 @@ import 'package:cuflix/models/content_item.dart';
 import 'package:cuflix/widgets/telegram_setup_dialog.dart';
 import 'package:cuflix/services/telegram_service.dart';
 
-class ContentDetailScreen extends StatelessWidget {
+class ContentDetailScreen extends StatefulWidget {
   final ContentItem content;
-
   const ContentDetailScreen({super.key, required this.content});
+
+  @override
+  State<ContentDetailScreen> createState() => _ContentDetailScreenState();
+}
+
+class _ContentDetailScreenState extends State<ContentDetailScreen> {
+  late Future<bool> _isSetupFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _isSetupFuture = TelegramService.isSetupComplete();
+  }
+
+  void _refreshSetupState() {
+    setState(() {
+      _isSetupFuture = TelegramService.isSetupComplete();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +32,6 @@ class ContentDetailScreen extends StatelessWidget {
       backgroundColor: Colors.black,
       body: CustomScrollView(
         slivers: [
-          // ── Hero image & collapsing app-bar ──────────────────────────────
           SliverAppBar(
             expandedHeight: 400,
             pinned: true,
@@ -24,15 +41,17 @@ class ContentDetailScreen extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   Image.network(
-                    content.posterUrl,
+                    widget.content.posterUrl,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
                       color: Colors.grey[800],
-                      child:
-                          const Icon(Icons.error, color: Colors.white, size: 48),
+                      child: const Icon(
+                        Icons.error,
+                        color: Colors.white,
+                        size: 48,
+                      ),
                     ),
                   ),
-                  // top-to-bottom black fade
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -40,7 +59,7 @@ class ContentDetailScreen extends StatelessWidget {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withValues(alpha: 0.7), // ← no deprecation
+                          Colors.black.withValues(alpha: 0.7),
                         ],
                       ),
                     ),
@@ -49,17 +68,14 @@ class ContentDetailScreen extends StatelessWidget {
               ),
             ),
           ),
-
-          // ── Details body ────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // title
                   Text(
-                    content.name,
+                    widget.content.name,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 28,
@@ -67,37 +83,33 @@ class ContentDetailScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  // chips
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
                       _infoChip(
-                        label: content.contentType,
-                        color: _getContentTypeColor(content.contentType),
+                        label: widget.content.contentType,
+                        color: _getContentTypeColor(widget.content.contentType),
                       ),
-                      if (content.season?.isNotEmpty ?? false)
+                      if (widget.content.season?.isNotEmpty ?? false)
                         _infoChip(
                           label:
-                              '${content.season} Season${content.season == '1' ? '' : 's'}',
+                              '${widget.content.season} Season${widget.content.season == '1' ? '' : 's'}',
                           color: Colors.blue[700]!,
                         ),
-                      if (content.episodeType?.isNotEmpty ?? false)
+                      if (widget.content.episodeType?.isNotEmpty ?? false)
                         _infoChip(
-                          label: content.episodeType!,
+                          label: widget.content.episodeType!,
                           color: Colors.green[700]!,
                         ),
                       _infoChip(
-                        label: content.category,
+                        label: widget.content.category,
                         color: Colors.orange[700]!,
                       ),
                     ],
                   ),
                   const SizedBox(height: 20),
-
-                  // description
-                  if (content.description.isNotEmpty) ...[
+                  if (widget.content.description.isNotEmpty) ...[
                     const Text(
                       'Description',
                       style: TextStyle(
@@ -108,7 +120,7 @@ class ContentDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      content.description,
+                      widget.content.description,
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 16,
@@ -117,9 +129,7 @@ class ContentDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
                   ],
-
-                  // watch options
-                  if (content.availableLinks.isNotEmpty) ...[
+                  if (widget.content.availableLinks.isNotEmpty) ...[
                     const Text(
                       'Watch Options',
                       style: TextStyle(
@@ -129,7 +139,9 @@ class ContentDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    ...content.availableLinks.asMap().entries.map((entry) {
+                    ...widget.content.availableLinks.asMap().entries.map((
+                      entry,
+                    ) {
                       final idx = entry.key;
                       final link = entry.value;
                       final episodeCount = link.split(',').length;
@@ -138,36 +150,51 @@ class ContentDetailScreen extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: SizedBox(
                           width: double.infinity,
-                          child: ElevatedButton.icon(
+                          child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF076AE0),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 16),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
                             onPressed: () =>
                                 _handleSendToTelegram(context, idx),
-                            icon: const Icon(Icons.send, color: Colors.white),
-                            label: Column(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment:
+                                  MainAxisAlignment.center, // center everything
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Text(
-                                  _getLinkLabel(idx, content.contentType),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                if (episodeCount > 1)
-                                  Text(
-                                    '$episodeCount episodes',
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 12,
+                                const Icon(Icons.send, color: Colors.white),
+                                const SizedBox(width: 8),
+                                Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      _getLinkLabel(
+                                        idx,
+                                        widget.content.contentType,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  ),
+                                    if (episodeCount > 1)
+                                      Text(
+                                        '$episodeCount episodes',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ],
                             ),
                           ),
@@ -175,8 +202,6 @@ class ContentDetailScreen extends StatelessWidget {
                       );
                     }),
                   ],
-
-                  // settings
                   const SizedBox(height: 32),
                   _buildSettingsSection(context),
                   const SizedBox(height: 32),
@@ -189,25 +214,20 @@ class ContentDetailScreen extends StatelessWidget {
     );
   }
 
-  // ─────────────────────────── Actions ──────────────────────────────────
-
   Future<void> _handleSendToTelegram(BuildContext ctx, int linkIdx) async {
-  final setupDone = await TelegramService.isSetupComplete();
+    final setupDone = await TelegramService.isSetupComplete();
+    if (!ctx.mounted) return;
 
-  // Make sure the context is still in the tree
-  if (!ctx.mounted) return;
-
-  if (setupDone) {
-    _sendDirectly(ctx, linkIdx);
-  } else {
-    _showTelegramDialog(ctx, linkIdx);
+    if (setupDone) {
+      await _sendDirectly(ctx, linkIdx);
+      _refreshSetupState();
+    } else {
+      await _showTelegramDialog(ctx, linkIdx);
+      _refreshSetupState();
+    }
   }
-}
-
-
 
   Future<void> _sendDirectly(BuildContext ctx, int linkIdx) async {
-    // show loading immediately (synchronous)
     showDialog(
       context: ctx,
       barrierDismissible: false,
@@ -218,25 +238,26 @@ class ContentDetailScreen extends StatelessWidget {
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
-            Text('Sending ${content.name}…',
-                style: const TextStyle(color: Colors.white)),
+            Text(
+              'Sending ${widget.content.name}…',
+              style: const TextStyle(color: Colors.white),
+            ),
           ],
         ),
       ),
     );
 
-    // capture navigator & messenger BEFORE the await
     final navigator = Navigator.of(ctx);
     final messenger = ScaffoldMessenger.of(ctx);
 
     try {
       final ok = await TelegramService.sendContentFiles(
-        content: content,
+        content: widget.content,
         linkIndex: linkIdx,
       );
 
       if (!navigator.mounted) return;
-      navigator.pop(); // close loader
+      navigator.pop();
       messenger.showSnackBar(
         SnackBar(
           content: Text(
@@ -251,25 +272,18 @@ class ContentDetailScreen extends StatelessWidget {
       if (!navigator.mounted) return;
       navigator.pop();
       messenger.showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     }
   }
 
-  void _showTelegramDialog(BuildContext ctx, int linkIdx) {
-    showDialog(
+  Future<void> _showTelegramDialog(BuildContext ctx, int linkIdx) async {
+    await showDialog(
       context: ctx,
-      builder: (_) => TelegramSetupDialog(
-        content: content,
-        linkIndex: linkIdx,
-      ),
+      builder: (_) =>
+          TelegramSetupDialog(content: widget.content, linkIndex: linkIdx),
     );
   }
-
-  // ───────────────────────── Settings section ───────────────────────────
 
   Widget _buildSettingsSection(BuildContext ctx) {
     return Column(
@@ -285,7 +299,7 @@ class ContentDetailScreen extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         FutureBuilder<bool>(
-          future: TelegramService.isSetupComplete(),
+          future: _isSetupFuture,
           builder: (_, snap) {
             final isSetup = snap.data ?? false;
             return ListTile(
@@ -308,9 +322,13 @@ class ContentDetailScreen extends StatelessWidget {
                       onPressed: () => _resetTelegramSettings(ctx),
                       child: const Text('Reset'),
                     )
-                  : const Icon(Icons.arrow_forward_ios,
-                      color: Colors.white54),
-              onTap: isSetup ? null : () => _showTelegramDialog(ctx, 0),
+                  : const Icon(Icons.arrow_forward_ios, color: Colors.white54),
+              onTap: isSetup
+                  ? null
+                  : () async {
+                      await _showTelegramDialog(ctx, 0);
+                      _refreshSetupState();
+                    },
             );
           },
         ),
@@ -326,8 +344,10 @@ class ContentDetailScreen extends StatelessWidget {
       context: ctx,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.grey[900],
-        title: const Text('Reset Telegram Settings',
-            style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Reset Telegram Settings',
+          style: TextStyle(color: Colors.white),
+        ),
         content: const Text(
           'This will clear your saved bot token and chat ID.\n'
           'You\'ll need to set them up again.',
@@ -349,6 +369,7 @@ class ContentDetailScreen extends StatelessWidget {
 
     if (confirm == true) {
       await TelegramService.clearStoredCredentials();
+      _refreshSetupState();
       if (!navigator.mounted) return;
       messenger.showSnackBar(
         const SnackBar(
@@ -358,8 +379,6 @@ class ContentDetailScreen extends StatelessWidget {
       );
     }
   }
-
-  // ───────────────────────── Helpers ────────────────────────────────────
 
   String _getLinkLabel(int idx, String type) {
     final lower = type.toLowerCase();
@@ -383,7 +402,6 @@ class ContentDetailScreen extends StatelessWidget {
     }
   }
 
-  // renamed & camel-cased
   Widget _infoChip({required String label, required Color color}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

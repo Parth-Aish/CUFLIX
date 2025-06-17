@@ -217,7 +217,7 @@ class _SignInScreenState extends State<SignInScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Image.asset('assets/logo1.png', height: 35),
+        title: Image.asset('assets/logo1.png', height: 170),
         centerTitle: true,
         backgroundColor: Colors.black,
         elevation: 0,
